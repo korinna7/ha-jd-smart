@@ -39,6 +39,7 @@ JD_SMART_BASE_URL = "https://api.smart.jd.com"
 SNAPSHOT_PATH = "/c/service/integration/v1/getDeviceSnapshot_v1"
 CONTROL_PATH = "/c/service/integration/v1/controlDevice_v1"
 DEVICE_LIST_PATH = "/c/service/devmanager/v2/getDevicesAndCategory"
+GW_DETAILS_PATH = "/c/service/devmanager/v1/getDeviceDetails"
 
 APP_KEY = "a188caaf009839ba200bb55bb8fa38407a595c2a"
 HMAC_KEY = "e685c8d1daa7e4dec8821a3df41c0b34a56db779"

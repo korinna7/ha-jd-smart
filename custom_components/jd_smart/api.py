@@ -861,6 +861,33 @@ class JdSmartClient:
             raise JdSmartError("No JD Smart devices found")
         return devices
 
+    async def async_get_device_details(
+        self,
+        feed_id: str,
+        house_id: str | None,
+    ) -> dict[str, Any]:
+        """Fetch a device's full stream model via getDeviceDetails.
+        Goes through api.smart.jd.com + Wangyin encryption to avoid -4 error.
+        """
+        inner = {
+            "device_id": str(feed_id),
+            "is_weilian": 1,
+            "skill_id": "",
+            "json_data": {
+                "version": "2.0",
+                "feed_id": int(feed_id),
+                "houseId": str(house_id) if house_id is not None else "",
+            },
+        }
+        from .const import GW_DETAILS_PATH
+        raw_body = _json_dumps(inner)
+        LOGGER.debug(
+            "JD Smart getDeviceDetails: feed_id=%s, house_id=%s",
+            feed_id,
+            house_id,
+        )
+        return await self._request_wangyin_json(GW_DETAILS_PATH, raw_body)
+
     async def async_get_snapshot(
         self,
         feed_id: str,
