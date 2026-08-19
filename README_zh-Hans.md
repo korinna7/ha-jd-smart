@@ -61,25 +61,29 @@ config/custom_components/jd_smart/
 
 需要从一个可正常使用的京东小家 App 会话中获取请求参数。可以使用 Stream、Proxyman、Charles、HTTP Toolkit 或 mitmproxy 等工具抓取 HTTPS 请求。
 
-请打开空调页面并抓取成功调用：
+请打开空调页面并抓取成功调用的如下任意一个接口：
 
+```text
+https://api.m.jd.com/api?functionId=jdsmart.device.getDeviceDetails
+```
+或 
 ```text
 https://api.smart.jd.com/c/service/integration/v1/getDeviceSnapshot_v1
 ```
 
 尽量从同一次请求中复制所有字段。不需要手动填写 `feed_id`。认证通过后，集成会自动拉取设备列表，并允许一次选择一个或多个空调设备；已经配置过的设备不会再出现在选择列表中。
 
-`cookie`
+`cookie` (可选)
 
-抓包中的完整 `Cookie` 请求头。
+抓包中的完整 `Cookie` 请求头。如果您的抓包是 `api.m.jd.com`，您只需在此处粘贴 `Cookie`，集成会自动为您提取 `tgt` 和 `pin`！如果您的抓包中没有 Cookie，直接留空即可。
 
-`tgt`
+`tgt` (必填)
 
 抓包中的 `tgt` 请求头。
 
-`pin`
+`pin` (必填)
 
-可选京东账号 PIN，用于 token 刷新。
+您的京东账号 PIN，用于 token 刷新。它可以在 `cookie` 内部找到（如果有的话），或者在抓包的其他部分。
 
 `sgm_context`
 

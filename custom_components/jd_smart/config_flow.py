@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import secrets
 from typing import Any
+from urllib.parse import unquote
 
 import voluptuous as vol
 
@@ -22,6 +23,7 @@ from .api import (
     JdSmartDeviceProfile,
     JdSmartError,
     JdSmartTokenRefreshError,
+    _parse_cookie,
 )
 from .const import (
     CONF_APP_VERSION,
@@ -93,8 +95,8 @@ def _schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     defaults = defaults or {}
     return vol.Schema(
         {
-            vol.Required(CONF_COOKIE, default=defaults.get(CONF_COOKIE, "")): str,
-            vol.Required(CONF_TGT, default=defaults.get(CONF_TGT, "")): str,
+            vol.Optional(CONF_COOKIE, default=defaults.get(CONF_COOKIE, "")): str,
+            vol.Optional(CONF_TGT, default=defaults.get(CONF_TGT, "")): str,
             vol.Optional(CONF_PIN, default=defaults.get(CONF_PIN, "")): str,
             vol.Optional(
                 CONF_SGM_CONTEXT, default=defaults.get(CONF_SGM_CONTEXT, "")
@@ -133,6 +135,14 @@ def _schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
 def _clean_input(user_input: dict[str, Any]) -> dict[str, Any]:
     """Clean user input and fill defaults."""
     data = {key: value for key, value in user_input.items() if value != ""}
+    if CONF_COOKIE in data:
+        items = _parse_cookie(data[CONF_COOKIE])
+        for k, v in items:
+            if k.lower() == "wskey" and CONF_TGT not in data:
+                data[CONF_TGT] = v
+            elif k.lower() == "pin" and CONF_PIN not in data:
+                data[CONF_PIN] = unquote(v)
+
     data.setdefault(CONF_DEVICE_ID, DEFAULT_DEVICE_ID or str(secrets.randbelow(10**20)))
     data.setdefault(CONF_PLATFORM, DEFAULT_PLATFORM)
     data.setdefault(CONF_APP_VERSION, DEFAULT_APP_VERSION)
@@ -148,9 +158,9 @@ def _client_from_data(hass: HomeAssistant, data: dict[str, Any]) -> JdSmartClien
     return JdSmartClient(
         async_get_clientsession(hass),
         JdSmartCredentials(
-            cookie=data[CONF_COOKIE],
-            tgt=data[CONF_TGT],
-            pin=data.get(CONF_PIN),
+            cookie=data.get(CONF_COOKIE, ""),
+            tgt=data.get(CONF_TGT, ""),
+            pin=data.get(CONF_PIN, ""),
             sgm_context=data.get(CONF_SGM_CONTEXT),
         ),
         JdSmartDeviceProfile(
@@ -235,36 +245,39 @@ class JdSmartAcConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             data = _clean_input(user_input)
-            try:
-                await _refresh_auth(self.hass, data)
-                devices = await _fetch_devices(self.hass, data)
-            except JdSmartTokenRefreshError:
-                errors["base"] = "token_refresh_failed"
-            except JdSmartAuthError:
-                errors["base"] = "invalid_auth"
-            except JdSmartCannotConnectError:
-                errors["base"] = "cannot_connect"
-            except JdSmartError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
-                LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+            if not data.get(CONF_TGT) or not data.get(CONF_PIN):
+                errors["base"] = "missing_tgt_or_pin"
             else:
-                if self._async_current_entries():
-                    await self._async_update_auth_entries(data)
-                    return self.async_abort(reason="auth_updated")
+                try:
+                    await _refresh_auth(self.hass, data)
+                    devices = await _fetch_devices(self.hass, data)
+                except JdSmartTokenRefreshError:
+                    errors["base"] = "token_refresh_failed"
+                except JdSmartAuthError:
+                    errors["base"] = "invalid_auth"
+                except JdSmartCannotConnectError:
+                    errors["base"] = "cannot_connect"
+                except JdSmartError:
+                    errors["base"] = "cannot_connect"
+                except Exception:  # noqa: BLE001
+                    LOGGER.exception("Unexpected exception")
+                    errors["base"] = "unknown"
+                else:
+                    if self._async_current_entries():
+                        await self._async_update_auth_entries(data)
+                        return self.async_abort(reason="auth_updated")
 
-                self._auth_data = data
-                self._target_entry = None
-                configured_feed_ids = _configured_feed_ids(self._async_current_entries())
-                self._devices = [
-                    device
-                    for device in devices
-                    if device.feed_id not in configured_feed_ids
-                ]
-                if not self._devices:
-                    return self.async_abort(reason="no_devices")
-                return await self.async_step_select_device()
+                    self._auth_data = data
+                    self._target_entry = None
+                    configured_feed_ids = _configured_feed_ids(self._async_current_entries())
+                    self._devices = [
+                        device
+                        for device in devices
+                        if device.feed_id not in configured_feed_ids
+                    ]
+                    if not self._devices:
+                        return self.async_abort(reason="no_devices")
+                    return await self.async_step_select_device()
 
         return self.async_show_form(
             step_id="user",

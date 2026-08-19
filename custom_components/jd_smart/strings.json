@@ -9,6 +9,7 @@
     "error": {
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+      "missing_tgt_or_pin": "Please provide TGT and PIN, or paste a Cookie to automatically extract them.",
       "token_refresh_failed": "Authentication refresh failed. Check the notification for details or enter new authentication data manually.",
       "unknown": "[%key:common::config_flow::error::unknown%]"
     },
@@ -23,7 +24,7 @@
         "data": {
           "app_version": "App version",
           "channel": "Channel",
-          "cookie": "Cookie",
+          "cookie": "Cookie (Optional)",
           "device_id": "Device ID",
           "device_model": "Device model",
           "platform": "Platform",
@@ -36,14 +37,14 @@
         "data_description": {
           "app_version": "App version from the working capture.",
           "channel": "Request channel from the working capture.",
-          "cookie": "Cookie copied from the JD Smart app capture.",
+          "cookie": "Optional. Paste to automatically extract TGT and PIN.",
           "device_id": "Public request device_id. Leave empty to generate one.",
           "device_model": "Request hard_platform/appplatform value.",
           "platform": "Exact request plat value from the working capture.",
           "platform_version": "Request plat_version/appplatformversion value.",
-          "pin": "Optional JD account PIN, used for token refresh.",
+          "pin": "Required. JD account PIN, used for token refresh.",
           "sgm_context": "Optional Sgm-Context header from a working capture.",
-          "tgt": "The JD app A2/wskey/tgt token.",
+          "tgt": "Required. The JD app A2/wskey/tgt token.",
           "user_agent": "User-Agent from the working capture."
         },
         "description": "Enter JD Smart app capture data. The integration will fetch your devices after authentication."

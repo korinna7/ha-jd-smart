@@ -63,8 +63,12 @@ Settings -> Devices & services -> Add integration -> JD Smart
 
 You need values from a working JD Smart / JD Xiaojia mobile app session. You can capture HTTPS traffic with a tool such as Stream, Proxyman, Charles, HTTP Toolkit, or mitmproxy.
 
-Open the air conditioner page and capture a successful request to:
+Open the air conditioner page and capture a successful request to either:
 
+```text
+https://api.m.jd.com/api?functionId=jdsmart.device.getDeviceDetails
+```
+or 
 ```text
 https://api.smart.jd.com/c/service/integration/v1/getDeviceSnapshot_v1
 ```
@@ -74,17 +78,17 @@ Use values from the same request whenever possible. You do not need to enter
 devices and lets you select one or more air conditioners. Devices that are
 already configured are hidden from the selection list.
 
-`cookie`
+`cookie` (Optional)
 
-The full `Cookie` request header from the captured app request.
+The full `Cookie` request header from the captured app request. If your capture is from `api.m.jd.com`, you can simply paste the `cookie` here, and the integration will automatically extract your `tgt` and `pin` for you! If your capture doesn't have a cookie, just leave this blank.
 
-`tgt`
+`tgt` (Required)
 
 The `tgt` request header from the captured app request.
 
-`pin`
+`pin` (Required)
 
-Optional JD account PIN, used for token refresh.
+Your JD account PIN, used for token refresh. It can be found inside the `cookie` (if you have one) or in other parts of the request.
 
 `sgm_context`
 
