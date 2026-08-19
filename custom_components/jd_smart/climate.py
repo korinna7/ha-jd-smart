@@ -26,6 +26,15 @@ MODE_TO_HVAC = {
 }
 HVAC_TO_MODE = {value: key for key, value in MODE_TO_HVAC.items()}
 
+GREE_MODE_TO_HVAC = {
+    "0": HVACMode.AUTO,
+    "1": HVACMode.COOL,
+    "2": HVACMode.DRY,
+    "3": HVACMode.FAN_ONLY,
+    "4": HVACMode.HEAT,
+}
+GREE_HVAC_TO_MODE = {value: key for key, value in GREE_MODE_TO_HVAC.items()}
+
 FAN_TO_VALUE = {
     "silent": "0",
     "low": "1",
@@ -34,6 +43,15 @@ FAN_TO_VALUE = {
     "auto": "5",
 }
 VALUE_TO_FAN = {value: key for key, value in FAN_TO_VALUE.items()}
+
+GREE_FAN_TO_VALUE = {
+    "auto": "0",
+    "low": "1",
+    "medium": "3",
+    "high": "5",
+    "strong": "6",
+}
+GREE_VALUE_TO_FAN = {value: key for key, value in GREE_FAN_TO_VALUE.items()}
 
 SWING_TO_VALUE = {
     "swing": "0",
@@ -47,6 +65,17 @@ SWING_TO_VALUE = {
 }
 VALUE_TO_SWING = {value: key for key, value in SWING_TO_VALUE.items()}
 
+GREE_SWING_TO_VALUE = {
+    "off": "0",
+    "auto": "1",
+    "up": "2",
+    "mid": "3",
+    "down_15": "4",
+    "down_30": "5",
+    "down_45": "6",
+}
+GREE_VALUE_TO_SWING = {value: key for key, value in GREE_SWING_TO_VALUE.items()}
+
 PRESET_TO_VALUE = {
     "off": "0",
     "normal": "1",
@@ -55,6 +84,12 @@ PRESET_TO_VALUE = {
     "child": "4",
 }
 VALUE_TO_PRESET = {value: key for key, value in PRESET_TO_VALUE.items()}
+
+GREE_PRESET_TO_VALUE = {
+    "off": "0",
+    "sleep": "1",
+}
+GREE_VALUE_TO_PRESET = {value: key for key, value in GREE_PRESET_TO_VALUE.items()}
 
 
 async def async_setup_entry(
@@ -91,14 +126,31 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
         HVACMode.FAN_ONLY,
         HVACMode.AUTO,
     ]
-    _attr_fan_modes = list(FAN_TO_VALUE)
-    _attr_preset_modes = list(PRESET_TO_VALUE)
-    _attr_swing_modes = list(SWING_TO_VALUE)
     _attr_translation_key = "air_conditioner"
 
     def __init__(self, coordinator) -> None:
         """Initialize climate."""
         super().__init__(coordinator, "climate")
+
+    @property
+    def is_gree(self) -> bool:
+        """Duck type to detect Gree protocol."""
+        return "Mod" in self.streams
+
+    @property
+    def fan_modes(self) -> list[str]:
+        """Return the list of available fan modes."""
+        return list(GREE_FAN_TO_VALUE) if self.is_gree else list(FAN_TO_VALUE)
+
+    @property
+    def preset_modes(self) -> list[str]:
+        """Return the list of available preset modes."""
+        return list(GREE_PRESET_TO_VALUE) if self.is_gree else list(PRESET_TO_VALUE)
+
+    @property
+    def swing_modes(self) -> list[str]:
+        """Return the list of available swing modes."""
+        return list(GREE_SWING_TO_VALUE) if self.is_gree else list(SWING_TO_VALUE)
 
     @property
     def current_temperature(self) -> float | None:
@@ -120,21 +172,29 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
         """Return HVAC mode."""
         if self.streams.get("power") == "0":
             return HVACMode.OFF
+        if self.is_gree:
+            return GREE_MODE_TO_HVAC.get(self.streams.get("Mod", ""))
         return MODE_TO_HVAC.get(self.streams.get("mode", ""))
 
     @property
     def fan_mode(self) -> str | None:
         """Return fan mode."""
+        if self.is_gree:
+            return GREE_VALUE_TO_FAN.get(self.streams.get("mark", ""))
         return VALUE_TO_FAN.get(self.streams.get("mark", ""))
 
     @property
     def swing_mode(self) -> str | None:
         """Return swing mode."""
+        if self.is_gree:
+            return GREE_VALUE_TO_SWING.get(self.streams.get("SwUpDn", ""))
         return VALUE_TO_SWING.get(self.streams.get("verdir", ""))
 
     @property
     def preset_mode(self) -> str | None:
         """Return preset mode."""
+        if self.is_gree:
+            return GREE_VALUE_TO_PRESET.get(self.streams.get("sleepmode", ""))
         return VALUE_TO_PRESET.get(self.streams.get("sleepmode", ""))
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
@@ -149,20 +209,33 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
         if hvac_mode == HVACMode.OFF:
             await self._control({"power": 0})
             return
-        mode = HVAC_TO_MODE[hvac_mode]
-        await self._control({"power": 1, "mode": int(mode)})
+        if self.is_gree:
+            mode = GREE_HVAC_TO_MODE[hvac_mode]
+            await self._control({"power": 1, "Mod": int(mode)})
+        else:
+            mode = HVAC_TO_MODE[hvac_mode]
+            await self._control({"power": 1, "mode": int(mode)})
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set fan mode."""
-        await self._control({"mark": int(FAN_TO_VALUE[fan_mode])})
+        if self.is_gree:
+            await self._control({"mark": int(GREE_FAN_TO_VALUE[fan_mode])})
+        else:
+            await self._control({"mark": int(FAN_TO_VALUE[fan_mode])})
 
     async def async_set_swing_mode(self, swing_mode: str) -> None:
         """Set swing mode."""
-        await self._control({"verdir": int(SWING_TO_VALUE[swing_mode])})
+        if self.is_gree:
+            await self._control({"SwUpDn": int(GREE_SWING_TO_VALUE[swing_mode])})
+        else:
+            await self._control({"verdir": int(SWING_TO_VALUE[swing_mode])})
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set preset mode."""
-        await self._control({"sleepmode": int(PRESET_TO_VALUE[preset_mode])})
+        if self.is_gree:
+            await self._control({"sleepmode": int(GREE_PRESET_TO_VALUE[preset_mode])})
+        else:
+            await self._control({"sleepmode": int(PRESET_TO_VALUE[preset_mode])})
 
     async def _control(self, commands: dict[str, object]) -> None:
         """Control helper."""

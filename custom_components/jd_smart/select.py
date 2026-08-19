@@ -45,6 +45,18 @@ async def async_setup_entry(
     )
 
 
+GREE_OPTION_TO_VALUE = {
+    "direct": "0",
+    "swing": "1",
+    "left_20": "2",
+    "left_10": "3",
+    "mid": "4",
+    "right_10": "5",
+    "right_20": "6",
+}
+GREE_VALUE_TO_OPTION = {v: k for k, v in GREE_OPTION_TO_VALUE.items()}
+
+
 class JdSmartSelect(JdSmartEntity, SelectEntity):
     """JD Smart stream select."""
 
@@ -64,21 +76,44 @@ class JdSmartSelect(JdSmartEntity, SelectEntity):
         }
 
     @property
+    def is_gree(self) -> bool:
+        """Duck type to detect Gree protocol."""
+        return "Mod" in self.streams
+
+    @property
+    def stream_id(self) -> str:
+        if self.is_gree and self.entity_description.key == "hordir":
+            return "SwingLfRig"
+        return self.entity_description.stream_id
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return super().available and self.stream_id in self.streams
+
+    @property
+    def options(self) -> list[str]:
+        """Return the list of available options."""
+        if self.is_gree and self.entity_description.key == "hordir":
+            return list(GREE_OPTION_TO_VALUE)
+        return self.entity_description.options
+
+    @property
     def current_option(self) -> str | None:
         """Return selected option."""
-        return self._value_to_option.get(
-            self.streams.get(self.entity_description.stream_id, "")
-        )
+        value = self.streams.get(self.stream_id, "")
+        if self.is_gree and self.entity_description.key == "hordir":
+            return GREE_VALUE_TO_OPTION.get(value)
+        return self._value_to_option.get(value)
 
     async def async_select_option(self, option: str) -> None:
         """Select option."""
+        if self.is_gree and self.entity_description.key == "hordir":
+            val = int(GREE_OPTION_TO_VALUE[option])
+        else:
+            val = int(self.entity_description.option_to_value[option])
+            
         try:
-            await self.coordinator.async_control_streams(
-                {
-                    self.entity_description.stream_id: int(
-                        self.entity_description.option_to_value[option]
-                    )
-                }
-            )
+            await self.coordinator.async_control_streams({self.stream_id: val})
         except Exception as err:
             raise HomeAssistantError("Unable to control JD Smart") from err
