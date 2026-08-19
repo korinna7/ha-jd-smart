@@ -30,8 +30,10 @@ from .const import (
     DOMAIN,
     FAST_POLL_DURATION,
     FAST_POLL_INTERVAL,
+    FIRST_REFRESH_RETRY_DELAY,
     LOGGER,
     UPDATE_AUTH_FAILURE_THRESHOLD,
+    UPDATE_FAILURE_GRACE_PERIOD,
 )
 
 type JdSmartConfigEntry = ConfigEntry[JdSmartRuntimeData]
@@ -72,36 +74,56 @@ class JdSmartCoordinator(DataUpdateCoordinator[JdSmartSnapshot]):
         self._fast_poll_cancel: Callable[[], None] | None = None
         self._token_refresh_lock = asyncio.Lock()
         self._consecutive_update_failures = 0
+        self._last_successful_update: datetime | None = None
+        self._update_unavailable_logged = False
 
     async def _async_update_data(self) -> JdSmartSnapshot:
         """Fetch latest snapshot."""
         digest = self.data.digest if self.data else ""
-        try:
-            snapshot = await self.client.async_get_snapshot(self.feed_id, digest)
-            self._consecutive_update_failures = 0
-            return snapshot
-        except JdSmartAuthError:
-            LOGGER.info("JD Smart snapshot authentication failed; refreshing token")
+        attempts = 2 if self.data is None else 1
+        for attempt in range(attempts):
             try:
-                await self._async_refresh_token()
                 snapshot = await self.client.async_get_snapshot(self.feed_id, digest)
-                self._consecutive_update_failures = 0
-                return snapshot
-            except JdSmartAuthError as refresh_err:
-                self._async_create_reauth_notification()
-                raise ConfigEntryAuthFailed from refresh_err
-            except JdSmartCannotConnectError as refresh_err:
+                return self._handle_update_success(snapshot)
+            except JdSmartAuthError:
+                LOGGER.info("JD Smart snapshot authentication failed; refreshing token")
+                try:
+                    await self._async_refresh_token()
+                    snapshot = await self.client.async_get_snapshot(self.feed_id, digest)
+                    return self._handle_update_success(snapshot)
+                except JdSmartAuthError as refresh_err:
+                    self._async_create_reauth_notification()
+                    raise ConfigEntryAuthFailed from refresh_err
+                except JdSmartCannotConnectError as refresh_err:
+                    if self.data is None:
+                        raise ConfigEntryNotReady from refresh_err
+                    return self._handle_update_failure(refresh_err)
+                except JdSmartError as refresh_err:
+                    return self._handle_update_failure(refresh_err)
+            except JdSmartCannotConnectError as err:
                 if self.data is None:
-                    raise ConfigEntryNotReady from refresh_err
-                await self._async_handle_update_failure(refresh_err)
-            except JdSmartError as refresh_err:
-                await self._async_handle_update_failure(refresh_err)
-        except JdSmartCannotConnectError as err:
-            if self.data is None:
-                raise ConfigEntryNotReady from err
-            await self._async_handle_update_failure(err)
-        except JdSmartError as err:
-            await self._async_handle_update_failure(err)
+                    if attempt < attempts - 1:
+                        LOGGER.warning(
+                            "JD Smart first snapshot fetch failed; "
+                            "retrying once: feed_id=%s, error=%s",
+                            self.feed_id,
+                            err,
+                        )
+                        await asyncio.sleep(FIRST_REFRESH_RETRY_DELAY)
+                        continue
+                    raise ConfigEntryNotReady from err
+                return self._handle_update_failure(err)
+            except JdSmartError as err:
+                if self.data is None and attempt < attempts - 1:
+                    LOGGER.warning(
+                        "JD Smart first snapshot fetch failed; "
+                        "retrying once: feed_id=%s, error=%s",
+                        self.feed_id,
+                        err,
+                    )
+                    await asyncio.sleep(FIRST_REFRESH_RETRY_DELAY)
+                    continue
+                return self._handle_update_failure(err)
         raise UpdateFailed("Unable to update JD Smart")
 
     async def async_control_streams(self, commands: dict[str, object]) -> None:
@@ -143,7 +165,7 @@ class JdSmartCoordinator(DataUpdateCoordinator[JdSmartSnapshot]):
             )
             raise UpdateFailed("Unable to control JD Smart") from err
         if snapshot is not None:
-            self.async_set_updated_data(snapshot)
+            self.async_set_updated_data(self._handle_update_success(snapshot))
         self.trigger_fast_polling()
         await self.async_request_refresh()
 
@@ -165,9 +187,46 @@ class JdSmartCoordinator(DataUpdateCoordinator[JdSmartSnapshot]):
                 },
             )
 
-    async def _async_handle_update_failure(self, err: JdSmartError) -> None:
-        """Handle repeated update failures."""
+    def _handle_update_success(self, snapshot: JdSmartSnapshot) -> JdSmartSnapshot:
+        """Record a successful update and return its snapshot."""
+        self._consecutive_update_failures = 0
+        self._last_successful_update = dt_util.utcnow()
+        self._update_unavailable_logged = False
+        return snapshot
+
+    def _handle_update_failure(self, err: JdSmartError) -> JdSmartSnapshot:
+        """Keep recent data during transient failures before going unavailable."""
         self._consecutive_update_failures += 1
+        now = dt_util.utcnow()
+        if self.data is not None and self._last_successful_update is not None:
+            stale_for = now - self._last_successful_update
+            if stale_for < UPDATE_FAILURE_GRACE_PERIOD:
+                log = (
+                    LOGGER.warning
+                    if self._consecutive_update_failures == 1
+                    else LOGGER.debug
+                )
+                log(
+                    "JD Smart update failed; retaining cached snapshot: "
+                    "feed_id=%s, failures=%s, stale_for=%s, error_type=%s, error=%s",
+                    self.feed_id,
+                    self._consecutive_update_failures,
+                    stale_for,
+                    err.__class__.__name__,
+                    err,
+                )
+                return self.data
+
+        log = LOGGER.warning if not self._update_unavailable_logged else LOGGER.debug
+        log(
+            "JD Smart update failed; marking entities unavailable: "
+            "feed_id=%s, failures=%s, error_type=%s, error=%s",
+            self.feed_id,
+            self._consecutive_update_failures,
+            err.__class__.__name__,
+            err,
+        )
+        self._update_unavailable_logged = True
         if self._consecutive_update_failures >= UPDATE_AUTH_FAILURE_THRESHOLD:
             LOGGER.warning(
                 "JD Smart update failed repeatedly; requesting reauthentication: "

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 from dataclasses import dataclass
 from datetime import datetime
@@ -55,7 +56,8 @@ WANGYIN_SEED_WRAP_KEY = bytes.fromhex(
     "1234567890ABCDEF1234567890ABCDEF"
     "1234567890ABCDEF1234567890ABCDEF"
 )
-
+WANGYIN_MAX_ATTEMPTS = 4
+WANGYIN_RETRY_DELAYS = (0.5, 1.0, 2.0)
 
 class JdSmartError(Exception):
     """Base JD Smart error."""
@@ -695,7 +697,7 @@ class JdSmartClient:
         raw_body: str,
     ) -> dict[str, Any]:
         """POST a Wangyin-encrypted request."""
-        for attempt in range(2):
+        for attempt in range(WANGYIN_MAX_ATTEMPTS):
             raw_query = _json_dumps(self._public_query())
             ep = await self._async_wangyin_encode(raw_query)
             encrypted_body = await self._async_wangyin_encode(raw_body)
@@ -709,14 +711,20 @@ class JdSmartClient:
                 )
             except JdSmartDecryptError:
                 self._wangyin_session = None
-                if attempt == 0:
+                if attempt < WANGYIN_MAX_ATTEMPTS - 1:
+                    delay = WANGYIN_RETRY_DELAYS[attempt]
                     LOGGER.warning(
-                        "JD Smart Wangyin decrypt failed; retrying once: path=%s",
+                        "JD Smart Wangyin decrypt failed; retrying in %.1fs: "
+                        "path=%s, attempt=%s",
+                        delay,
                         path,
+                        attempt + 1,
                     )
+                    await asyncio.sleep(delay)
                     continue
                 LOGGER.warning(
-                    "JD Smart Wangyin decrypt failed after retry: path=%s",
+                    "JD Smart Wangyin decrypt failed after %s attempts: path=%s",
+                    WANGYIN_MAX_ATTEMPTS,
                     path,
                 )
                 raise

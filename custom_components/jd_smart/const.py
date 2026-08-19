@@ -9,6 +9,8 @@ LOGGER = logging.getLogger(__package__)
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 FAST_POLL_INTERVAL = timedelta(seconds=2)
 FAST_POLL_DURATION = timedelta(seconds=10)
+UPDATE_FAILURE_GRACE_PERIOD = timedelta(minutes=5)
+FIRST_REFRESH_RETRY_DELAY = 2.0
 
 CONF_APP_VERSION = "app_version"
 CONF_CHANNEL = "channel"
