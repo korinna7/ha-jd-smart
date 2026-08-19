@@ -164,6 +164,12 @@
             },
             "powerful": {
                 "name": "强力"
+            },
+            "quiet": {
+                "name": "静音模式"
+            },
+            "aux_heat": {
+                "name": "电辅热"
             }
         }
     }

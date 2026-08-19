@@ -164,6 +164,12 @@
       },
       "powerful": {
         "name": "Powerful"
+      },
+      "quiet": {
+        "name": "Quiet Mode"
+      },
+      "aux_heat": {
+        "name": "Aux Heat"
       }
     }
   }
