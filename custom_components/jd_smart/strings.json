@@ -114,6 +114,23 @@
               "direction_4": "Direction 4",
               "direction_5": "Direction 5",
               "direction_6": "Direction 6",
+              "down_15": "Down 15°",
+              "down_30": "Down 30°",
+              "down_45": "Down 45°",
+              "mid": "Middle",
+              "off": "Off",
+              "swing": "Swing",
+              "up": "Up"
+            }
+          },
+          "swing_horizontal_mode": {
+            "state": {
+              "direct": "Direct",
+              "left_10": "Left 10°",
+              "left_20": "Left 20°",
+              "mid": "Middle",
+              "right_10": "Right 10°",
+              "right_20": "Right 20°",
               "swing": "Swing"
             }
           }
@@ -146,16 +163,10 @@
         "name": "TVOC"
       }
     },
-    "select": {
-      "horizontal_direction": {
-        "name": "Horizontal direction",
-        "state": {
-          "direct": "Direct",
-          "swing": "Swing"
-        }
-      }
-    },
     "switch": {
+      "power": {
+        "name": "Power"
+      },
       "backlight": {
         "name": "Backlight"
       },

@@ -114,18 +114,26 @@
                             "direction_4": "风向 4",
                             "direction_5": "风向 5",
                             "direction_6": "风向 6",
+                            "down_15": "下 15°",
+                            "down_30": "下 30°",
+                            "down_45": "下 45°",
+                            "mid": "中间",
+                            "off": "关闭",
+                            "swing": "扫风",
+                            "up": "上"
+                        }
+                    },
+                    "swing_horizontal_mode": {
+                        "state": {
+                            "direct": "定向",
+                            "left_10": "左 10°",
+                            "left_20": "左 20°",
+                            "mid": "中间",
+                            "right_10": "右 10°",
+                            "right_20": "右 20°",
                             "swing": "扫风"
                         }
                     }
-                }
-            }
-        },
-        "select": {
-            "horizontal_direction": {
-                "name": "左右风",
-                "state": {
-                    "direct": "定向",
-                    "swing": "扫风"
                 }
             }
         },
@@ -156,6 +164,9 @@
             }
         },
         "switch": {
+            "power": {
+                "name": "电源"
+            },
             "backlight": {
                 "name": "背光灯"
             },

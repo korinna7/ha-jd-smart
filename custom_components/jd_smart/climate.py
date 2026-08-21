@@ -76,6 +76,27 @@ GREE_SWING_TO_VALUE = {
 }
 GREE_VALUE_TO_SWING = {value: key for key, value in GREE_SWING_TO_VALUE.items()}
 
+HORIZONTAL_SWING_TO_VALUE = {
+    "swing": "0",
+    "direct": "1",
+}
+VALUE_TO_HORIZONTAL_SWING = {
+    value: key for key, value in HORIZONTAL_SWING_TO_VALUE.items()
+}
+
+GREE_HORIZONTAL_SWING_TO_VALUE = {
+    "direct": "0",
+    "swing": "1",
+    "left_20": "2",
+    "left_10": "3",
+    "mid": "4",
+    "right_10": "5",
+    "right_20": "6",
+}
+GREE_VALUE_TO_HORIZONTAL_SWING = {
+    value: key for key, value in GREE_HORIZONTAL_SWING_TO_VALUE.items()
+}
+
 PRESET_TO_VALUE = {
     "off": "0",
     "normal": "1",
@@ -108,14 +129,6 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
     """JD Smart climate entity."""
 
     _attr_name = None
-    _attr_supported_features = (
-        ClimateEntityFeature.TARGET_TEMPERATURE
-        | ClimateEntityFeature.FAN_MODE
-        | ClimateEntityFeature.PRESET_MODE
-        | ClimateEntityFeature.SWING_MODE
-        | ClimateEntityFeature.TURN_ON
-        | ClimateEntityFeature.TURN_OFF
-    )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 18
     _attr_max_temp = 32
@@ -140,6 +153,26 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
         return "Mod" in self.streams
 
     @property
+    def _horizontal_swing_stream_id(self) -> str:
+        """Return the horizontal swing stream id."""
+        return "SwingLfRig" if self.is_gree else "hordir"
+
+    @property
+    def supported_features(self) -> ClimateEntityFeature:
+        """Return supported features."""
+        features = (
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.FAN_MODE
+            | ClimateEntityFeature.PRESET_MODE
+            | ClimateEntityFeature.SWING_MODE
+            | ClimateEntityFeature.TURN_ON
+            | ClimateEntityFeature.TURN_OFF
+        )
+        if self._horizontal_swing_stream_id in self.streams:
+            features |= ClimateEntityFeature.SWING_HORIZONTAL_MODE
+        return features
+
+    @property
     def fan_modes(self) -> list[str]:
         """Return the list of available fan modes."""
         return list(GREE_FAN_TO_VALUE) if self.is_gree else list(FAN_TO_VALUE)
@@ -153,6 +186,13 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
     def swing_modes(self) -> list[str]:
         """Return the list of available swing modes."""
         return list(GREE_SWING_TO_VALUE) if self.is_gree else list(SWING_TO_VALUE)
+
+    @property
+    def swing_horizontal_modes(self) -> list[str]:
+        """Return the list of available horizontal swing modes."""
+        if self.is_gree:
+            return list(GREE_HORIZONTAL_SWING_TO_VALUE)
+        return list(HORIZONTAL_SWING_TO_VALUE)
 
     @property
     def current_temperature(self) -> float | None:
@@ -191,6 +231,14 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
         if self.is_gree:
             return GREE_VALUE_TO_SWING.get(self.streams.get("SwUpDn", ""))
         return VALUE_TO_SWING.get(self.streams.get("verdir", ""))
+
+    @property
+    def swing_horizontal_mode(self) -> str | None:
+        """Return horizontal swing mode."""
+        value = self.streams.get(self._horizontal_swing_stream_id, "")
+        if self.is_gree:
+            return GREE_VALUE_TO_HORIZONTAL_SWING.get(value)
+        return VALUE_TO_HORIZONTAL_SWING.get(value)
 
     @property
     def preset_mode(self) -> str | None:
@@ -239,6 +287,16 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
             await self._control({"SwUpDn": int(GREE_SWING_TO_VALUE[swing_mode])})
         else:
             await self._control({"verdir": int(SWING_TO_VALUE[swing_mode])})
+
+    async def async_set_swing_horizontal_mode(
+        self, swing_horizontal_mode: str
+    ) -> None:
+        """Set horizontal swing mode."""
+        if self.is_gree:
+            value = GREE_HORIZONTAL_SWING_TO_VALUE[swing_horizontal_mode]
+        else:
+            value = HORIZONTAL_SWING_TO_VALUE[swing_horizontal_mode]
+        await self._control({self._horizontal_swing_stream_id: int(value)})
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set preset mode."""

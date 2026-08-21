@@ -23,6 +23,9 @@ class JdSmartSwitchDescription(SwitchEntityDescription):
 
 SWITCHES: tuple[JdSmartSwitchDescription, ...] = (
     JdSmartSwitchDescription(
+        key="power", stream_id="power", translation_key="power"
+    ),
+    JdSmartSwitchDescription(
         key="bglight", stream_id="bglight", translation_key="backlight"
     ),
     JdSmartSwitchDescription(

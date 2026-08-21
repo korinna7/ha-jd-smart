@@ -35,7 +35,6 @@ from .coordinator import JdSmartConfigEntry, JdSmartCoordinator, JdSmartRuntimeD
 PLATFORMS: list[Platform] = [
     Platform.CLIMATE,
     Platform.SWITCH,
-    Platform.SELECT,
     Platform.SENSOR,
 ]
 
