@@ -113,6 +113,8 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
         | ClimateEntityFeature.FAN_MODE
         | ClimateEntityFeature.PRESET_MODE
         | ClimateEntityFeature.SWING_MODE
+        | ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
     )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 18
@@ -196,6 +198,14 @@ class JdSmartClimate(JdSmartEntity, ClimateEntity):
         if self.is_gree:
             return GREE_VALUE_TO_PRESET.get(self.streams.get("sleepmode", ""))
         return VALUE_TO_PRESET.get(self.streams.get("sleepmode", ""))
+
+    async def async_turn_on(self) -> None:
+        """Turn on the AC."""
+        await self._control({"power": 1})
+
+    async def async_turn_off(self) -> None:
+        """Turn off the AC."""
+        await self._control({"power": 0})
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set target temperature."""

@@ -192,6 +192,14 @@ class JdSmartCoordinator(DataUpdateCoordinator[JdSmartSnapshot]):
         self._consecutive_update_failures = 0
         self._last_successful_update = dt_util.utcnow()
         self._update_unavailable_logged = False
+        
+        # JD Smart omits unchanged streams on delta updates (when digest is sent).
+        # We must merge the new streams with our cached streams to avoid losing state.
+        if self.data is not None:
+            merged = dict(self.data.streams)
+            merged.update(snapshot.streams)
+            snapshot.streams = merged
+            
         return snapshot
 
     def _handle_update_failure(self, err: JdSmartError) -> JdSmartSnapshot:
